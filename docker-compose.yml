@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  app1:
+      build: .
+      ports:
+        - "8000:8000"
+      command: poetry run uvicorn ms1.main:app --host 0.0.0.0 --port 8000
+      links:
+        - rabbitmq
+        - mongo
+        - app2
+      depends_on:
+        - rabbitmq
+        - mongo
+      networks:
+        - app-tier
+  app2:
+      build: .
+      ports:
+        - "9000:9000"
+      command: poetry run uvicorn ms2.main:app --host 0.0.0.0 --port 9000
+      links:
+        - rabbitmq
+        - mongo
+      depends_on:
+        - rabbitmq
+        - mongo
+      networks:
+        - app-tier
+
+  rabbitmq:
+    image: rabbitmq:3.11.14-management
+    ports:
+      - "5672:5672"
+      - "25676:25676"
+      - "8080:15672"
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "secret-cookie"
+      RABBITMQ_DEFAULT_USER: "rabbitmq"
+      RABBITMQ_DEFAULT_PASS: "rabbitmq"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - app-tier
+
+  mongo:
+    image: mongo:latest
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-tier
+
+  mongo-express:
+    image: mongo-express:latest
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+
+volumes:
+  rabbitmq-data:
+  mongo-data:
+
+networks:
+  app-tier:
+    driver: bridge
